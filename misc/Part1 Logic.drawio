@@ -1,0 +1,37 @@
+<mxfile host="Electron" modified="2025-04-01T18:00:55.151Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/23.1.5 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="42JDRpkuFscdFF3pEX1M" version="23.1.5" type="device">
+  <diagram name="Page-1" id="ivHQlwg6NwUelohbRYT-">
+    <mxGraphModel dx="1434" dy="870" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="YN6lnGB4OmpDMFDsjIrV-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="YN6lnGB4OmpDMFDsjIrV-2" target="YN6lnGB4OmpDMFDsjIrV-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="YN6lnGB4OmpDMFDsjIrV-2" value="int corePoolSize" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="70" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="YN6lnGB4OmpDMFDsjIrV-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="YN6lnGB4OmpDMFDsjIrV-3" target="YN6lnGB4OmpDMFDsjIrV-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="YN6lnGB4OmpDMFDsjIrV-3" value="int maxPoolSize" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="170" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="YN6lnGB4OmpDMFDsjIrV-4" value="long keepAliveTime, TimeUnit" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="324" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="YN6lnGB4OmpDMFDsjIrV-5" value="int queueSize" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="414" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="YN6lnGB4OmpDMFDsjIrV-6" value="int minSparethreads" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="500" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="YN6lnGB4OmpDMFDsjIrV-7" value="execute()&lt;br&gt;-check if worker threads size is less then corePoolSize =&amp;gt; addWorker()" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="590" y="40" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="YN6lnGB4OmpDMFDsjIrV-9" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="590" y="170" width="210" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

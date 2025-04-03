@@ -29,10 +29,9 @@ public class MyThreadPoolExecutor implements CustomExecutor{
     // по умолчанию в ThreadPoolExecutor измерения ведутся в наносекундах, в нашем варианте также необходима
     // вариативность, сохраним возможность сохранения больших чисел - оставим long.
     private volatile long keepAliveTime;
+    private volatile int queueSize;
     
-    private final int minSpareThreads;
-    
-    private final int queueSize;
+    private volatile int minSpareThreads;
 
     /**
      * Для сохранения состояния главного пула потоков используется atomic integer, включающий в себя две части:
@@ -259,6 +258,19 @@ public class MyThreadPoolExecutor implements CustomExecutor{
                 }
             }
         }
+    }
+
+    private ThreadFactory getThreadFactory() {
+        return new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                return null;
+            }
+        };
+    }
+
+    private void runWorker(Worker worker) {
+        
     }
 
     public MyThreadPoolExecutor(int corePoolSize,
