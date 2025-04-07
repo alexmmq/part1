@@ -150,23 +150,37 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
         return null;
     }
 
+    /* реализуем логику из оригинального ThreadPoolExecutor - shutdown() инициирует прерывание всех потоков, находящихся
+    в ожидании задания */
+
     @Override
     public void shutdown() {
         lock.lock();
         try {
             toShutDown = true;
             for(Worker worker: workerList) {
-                worker.thread.interrupt();
+                Thread t = worker.thread;
+                if(!t.isInterrupted()){
+                    t.interrupt();
+                }
             }
         } finally {
             lock.unlock();
         }
     }
-
+    /* реализуем логику из оригинального ThreadPoolExecutor - shutdownNow() инициирует прерывание всех потоков,
+    без исключения
+     */
     @Override
     public void shutdownNow() {
-        synchronized (this) {
+        lock.lock();
+        try {
             toShutDown = true;
+            for(Worker worker: workerList) {
+                    worker.thread.interrupt();
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -185,6 +199,7 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
 
         @Override
         public void run() {
+            //TODO check for the KeepAliveTime - if exceeded and idle - interrupt the thread
             while (true) {
                 try {
                     currentTask = workQueue.get(queueIndex).take();
