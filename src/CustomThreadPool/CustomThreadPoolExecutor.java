@@ -7,6 +7,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class CustomThreadPoolExecutor implements CustomExecutor{
@@ -31,7 +32,6 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
     // по умолчанию в ThreadPoolExecutor измерения ведутся в наносекундах, в нашем варианте также необходима
     // вариативность, сохраним возможность сохранения больших чисел - оставим long.
     private volatile long keepAliveTime;
-
     private volatile TimeUnit timeUnit;
     private volatile int queueSize;
 
@@ -96,8 +96,8 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
             //ищем самую незагруженную очередь
             int laziest = findLaziestQueue();
 
-            //в случае удачи метод должен вернуть значение больше 0
-            if(laziest > 0) {
+            //в случае удачи метод должен вернуть значение не равное -1
+            if(laziest != -1) {
                 if (!workQueue.get(laziest).offer(command)) {
                     rejectedExecutionHandler.rejectedExecution(command, this);
                     return;
@@ -124,11 +124,16 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
     }
 
     private void createWorker(int index) {
-        //TODO: реализовать создание потоков через фабрику
-        Worker worker = new Worker(this, index);
-        workerList.add(worker);
-        worker.run();
-        logger.info(myThreadFactory.getClass().getName() + " creating new thread: " + worker.getName());
+        // Проверяем, достигли ли мы минимального числа резервных потоков
+        while (workerList.size() < minSpareThreads) {
+            Worker worker = new Worker(this, workerList.size());
+            workerList.add(worker);
+            worker.run();
+            // Инкрементируем счетчик активных потоков
+            active.incrementAndGet();
+
+            logger.info(myThreadFactory.getClass().getName() + " creating new thread: " + worker.getName());
+        }
     }
 
 
@@ -147,8 +152,46 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
 
     @Override
     public <T> Future<T> submit(Callable<T> callable) {
-        return null;
+        lock.lock();
+        try {
+            // Создаем FutureTask, который обернет нашу Callable
+            FutureTask<T> futureTask = new FutureTask<>(callable);
+
+            // Находим наименее загруженную очередь
+            int laziest = findLaziestQueue();
+
+            // Проверяем, можно ли добавить задачу в очередь
+            if (laziest >= 0 && workQueue.get(laziest).remainingCapacity() > 0) {
+                // Добавляем задачу в очередь
+                workQueue.get(laziest).put(futureTask);
+                logger.info(logger.getName() + " Task submitted into queue #" + laziest + ": " + callable.toString());
+
+                // Возвращаем Future для клиента
+                return futureTask;
+            } else {
+                // Преобразуем Callable в Runnable для передачи в обработчик отказов
+                Runnable runnable = () -> {
+                    try {
+                        callable.call();
+                    } catch (Exception e) {
+                        logger.log(Level.SEVERE, "Error executing task in rejectedExecutionHandler", e);
+                    }
+                };
+
+                // Отклоняем задачу, передавая Runnable
+                rejectedExecutionHandler.rejectedExecution(runnable, this);
+                throw new RejectedExecutionException("Queue is full, cannot accept more tasks.");
+            }
+        } catch (InterruptedException e) {
+            // Если поток был прерван во время ожидания, откладываем задачу обратно
+            rejectedExecutionHandler.rejectedExecution(() -> {}, this);
+            // Передаем пустое задание, так как важно вызвать обработчик
+            throw new RejectedExecutionException(e);
+        } finally {
+            lock.unlock();
+        }
     }
+
 
     /* реализуем логику из оригинального ThreadPoolExecutor - shutdown() инициирует прерывание всех потоков, находящихся
     в ожидании задания */
@@ -162,6 +205,7 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
                 Thread t = worker.thread;
                 if(!t.isInterrupted()){
                     t.interrupt();
+                    logger.info(t.getName() + "is interrupted");
                 }
             }
         } finally {
@@ -178,6 +222,7 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
             toShutDown = true;
             for(Worker worker: workerList) {
                     worker.thread.interrupt();
+                logger.info(worker.thread.getName() + "is interrupted");
             }
         } finally {
             lock.unlock();
@@ -199,22 +244,37 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
 
         @Override
         public void run() {
-            //TODO check for the KeepAliveTime - if exceeded and idle - interrupt the thread
+            // Локальная переменная для отслеживания текущего состояния потока
+            boolean isIdle = false;
+
             while (true) {
                 try {
-                    currentTask = workQueue.get(queueIndex).take();
-                    logger.info(Thread.currentThread().getName() + " executes task: " + currentTask.toString());
-                    currentTask.run();
+                    // Пробуем получить задачу из очереди с учетом времени ожидания
+                    currentTask = workQueue.get(queueIndex).poll(keepAliveTime, timeUnit);
 
-                    // Проверяем нужно ли завершить поток
-                    if (executor.active.get() > minSpareThreads) {
-                        return;
-                        // Завершение работы потока
+                    if (currentTask != null) {
+                        // Задача была успешно получена, выполняем её
+                        logger.info(Thread.currentThread().getName() +
+                                " executes task: " + currentTask.toString());
+                        currentTask.run();
+                        // Сбрасываем флаг простоя
+                        isIdle = false;
+                    } else {
+                        // Задача не была получена в отведенное время => пора завершать поток
+                        if (isIdle && executor.active.get() > corePoolSize) {
+                            // Поток был в простое дольше допустимого времени и количество
+                            // активных потоков превышает минимум
+                            logger.info(Thread.currentThread().getName() +
+                                    " idle timeout,stopping");
+                            return;
+                        } else {
+                            // Поток всё ещё активен, продолжаем ждать следующую задачу
+                            isIdle = true;
+                        }
                     }
                 } catch (InterruptedException e) {
                     logger.info(Thread.currentThread().getName() + " has been interrupted");
                     return;
-                    // Прерывание работы потока
                 } finally {
                     // Уменьшаем счетчик активных потоков
                     active.decrementAndGet();
@@ -223,7 +283,7 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
         }
 
         public String getName() {
-            return null;
+            return Worker.class.getName();
         }
     }
 }
