@@ -95,30 +95,34 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
     public void execute(Runnable command) {
         lock.lock();
         try {
-            //ищем самую незагруженную очередь
-            int laziest = findLaziestQueue();
+            //запускаем анализ только в случае если у Pool не поднят флаг toShutDown
+            if(!toShutDown){
+                //ищем самую незагруженную очередь
+                int laziest = findLaziestQueue();
 
-            //в случае удачи метод должен вернуть значение не равное -1
-            if(laziest != -1) {
-                if (!workQueue.get(laziest).offer(command)) {
-                    rejectedExecutionHandler.rejectedExecution(command, this);
-                    return;
-                }
-                logger.info(logger.getName() + " Task accepted into queue #" + laziest + ": " +
-                        command.toString());
-            } else {
-                //очереди не могут принять больше задач, необходимо увеличение количества потоков
-                //проверка достигнут ли максимальный размер пула
-                if(active.get() < maxPoolSize) {
-                    int index = workerList.size();
-                    createWorker(index);
-                    workQueue.get(index).offer(command);
+                //в случае удачи метод должен вернуть значение не равное -1
+                if(laziest != -1) {
+                    if (!workQueue.get(laziest).offer(command)) {
+                        rejectedExecutionHandler.rejectedExecution(command, this);
+                        return;
+                    }
                     logger.info(logger.getName() + " Task accepted into queue #" + laziest + ": " +
                             command.toString());
-                } else{
-                 rejectedExecutionHandler.rejectedExecution(command, this);
+                } else {
+                    //очереди не могут принять больше задач, необходимо увеличение количества потоков
+                    //проверка достигнут ли максимальный размер пула
+                    if(active.get() < maxPoolSize) {
+                        int index = workerList.size();
+                        createWorker(index);
+                        workQueue.get(index).offer(command);
+                        logger.info(logger.getName() + " Task accepted into queue #" + laziest + ": " +
+                                command.toString());
+                    }
                 }
             }
+            else{
+                 rejectedExecutionHandler.rejectedExecution(command, this);
+                }
         }
         finally{
             lock.unlock();
@@ -244,6 +248,7 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
             for(Worker worker: workerList) {
                     worker.thread.interrupt();
                 logger.info(worker.thread.getName() + "is interrupted");
+                active.decrementAndGet();
             }
         } finally {
             lock.unlock();
