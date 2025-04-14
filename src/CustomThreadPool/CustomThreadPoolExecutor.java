@@ -58,6 +58,8 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
 
     public CustomThreadPoolExecutor(int corePoolSize, int maxPoolSize, long keepAliveTime,
                                     TimeUnit timeUnit, int queueSize, int minSpareThreads) {
+        this.rejectedExecutionHandler = new CustomRejectHandler();
+        this.myThreadFactory = new CustomThreadFactory("ThreadFactory");
         this.corePoolSize = corePoolSize;
         this.maxPoolSize = maxPoolSize;
         this.keepAliveTime = keepAliveTime;
@@ -71,14 +73,14 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
         this.workerList = new ArrayList<>();
         this.workQueue = new LinkedList<LinkedBlockingQueue<Runnable>>();
         for(int i = 0; i < corePoolSize; i++){
+            workerList.add(new Worker(this, i));
             workQueue.add(new LinkedBlockingQueue<>(queueSize));
         }
 
         /*
         Обозначаем собственную политику отказов и ThreadFactory.
          */
-        this.rejectedExecutionHandler = new CustomRejectHandler();
-        this.myThreadFactory = new CustomThreadFactory("ThreadFactory");
+
     }
 
 
@@ -119,6 +121,23 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
             }
         }
         finally{
+            lock.unlock();
+        }
+    }
+
+    public void awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+        lock.lock();
+        try {
+            // Ждем, пока все потоки не завершат выполнение своих задач
+            while (active.get() > 0) {
+                // Проверяем, истекло ли время ожидания
+                if (workersCondition.await(timeout, unit)) {
+                    // Если время ожидания истекло, возвращаем false
+                    return;
+                }
+            }
+            // Все потоки завершили выполнение задач
+        } finally {
             lock.unlock();
         }
     }
@@ -195,6 +214,7 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
 
     /* реализуем логику из оригинального ThreadPoolExecutor - shutdown() инициирует прерывание всех потоков, находящихся
     в ожидании задания */
+    //#TODO перепроверить логику реализации shutdown и shutdownNow
 
     @Override
     public void shutdown() {
@@ -206,6 +226,7 @@ public class CustomThreadPoolExecutor implements CustomExecutor{
                 if(!t.isInterrupted()){
                     t.interrupt();
                     logger.info(t.getName() + "is interrupted");
+                    active.decrementAndGet();
                 }
             }
         } finally {
